@@ -37,7 +37,6 @@ def sparse_dropout(x, rate, noise_shape):
     """
     random_tensor = 1 - rate
     random_tensor += torch.rand(noise_shape).to(x.device)
-    #
     dropout_mask = torch.floor(random_tensor).bool()
     i = x._indices() # [2, 49216]
     v = x._values() # [49216]

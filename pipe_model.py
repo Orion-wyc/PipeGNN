@@ -19,53 +19,46 @@ class GCN(nn.Module):
         print('num_features_nonzero:', num_features_nonzero)
 
 
-        self.layers = nn.Sequential(GraphConvolution(self.input_dim, args.hidden, num_features_nonzero,
+        self.layers1 = nn.Sequential(GraphConvolution(self.input_dim, args.hidden, num_features_nonzero,
                                                      activation=F.relu,
                                                      dropout=args.dropout,
-                                                     is_sparse_inputs=True),
-
-                                    GraphConvolution(args.hidden, output_dim, num_features_nonzero,
+                                                     is_sparse_inputs=True)
+                                    ).to('cuda:0')
+        self.layers2 = nn.Sequential(GraphConvolution(args.hidden, output_dim, num_features_nonzero,
                                                      activation=F.relu,
                                                      dropout=args.dropout,
                                                      is_sparse_inputs=False)
-
-                                    )
-                                    
+                                    ).to('cuda:1')
 
     def forward(self, inputs):
-        x, support = inputs
+        # x, support = inputs
+        # x, support = self.layers1((x, support))
+        # x = self.layers2((x, support))
 
-        x = self.layers((x, support))
+        x, support = self.layers1(inputs)
+        x = self.layers2((x.to('cuda:1'), support.to('cuda:1')))
 
         return x
 
     def l2_loss(self):
-        # 为什么这里只算了一层的
-        layer = self.layers.children()
-        # print(type(layer))
-        # layer = next(iter(layer)) # 这不就坑人么
-        # print(type(layer))
 
+        layer = self.layers1.children()
         loss = None
+
         for l in layer:
             for p in l.parameters():
-                # print(p.size())
                 if loss is None:
                     loss = p.pow(2).sum()
                 else:
                     loss += p.pow(2).sum()
-            
+        loss = loss.to('cuda:1')
+        # print(loss.device)
+        layer = self.layers2.children()
+        for l in layer:
+            for p in l.parameters():
+                if loss is None:
+                    loss = p.pow(2).sum()
+                else:
+                    loss += p.pow(2).sum()
+        
         return loss
-
-
-if __name__ == "__main__":
-    net = GCN(2,3,3)
-    _ = net.l2_loss()
-    # layer = net.children()
-    # print(type(net))
-    # print(type(layer))
-    # cnt = 0
-    # for p in next(layer).parameters():
-    #     cnt+=1
-    #     print(cnt)
-    #     print(p.size())

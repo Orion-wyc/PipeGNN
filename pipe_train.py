@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 import  torch
 from    torch import nn
 from    torch import optim
@@ -5,9 +7,10 @@ from    torch.nn import functional as F
 
 import  numpy as np
 from    data import load_data, preprocess_features, preprocess_adj
-from    model import GCN
+from    pipe_model import GCN
 from    config import  args
 from    utils import masked_loss, masked_acc
+
 import time
 
 seed = 12345
@@ -26,25 +29,26 @@ print('mask:', train_mask.shape, val_mask.shape, test_mask.shape)
 features = preprocess_features(features) # [49216, 2], [49216], [2708, 1433]
 supports = preprocess_adj(adj)
 
-device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
-train_label = torch.from_numpy(y_train).long().to(device)
+# device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
+device = ['cuda:0', 'cuda:1']
+train_label = torch.from_numpy(y_train).long().to(device[1])
 num_classes = train_label.shape[1]
 train_label = train_label.argmax(dim=1)
-train_mask = torch.from_numpy(train_mask.astype(np.int)).to(device)
-val_label = torch.from_numpy(y_val).long().to(device)
+train_mask = torch.from_numpy(train_mask.astype(np.int)).to(device[1])
+val_label = torch.from_numpy(y_val).long().to(device[1])
 val_label = val_label.argmax(dim=1)
-val_mask = torch.from_numpy(val_mask.astype(np.int)).to(device)
-test_label = torch.from_numpy(y_test).long().to(device)
+val_mask = torch.from_numpy(val_mask.astype(np.int)).to(device[1])
+test_label = torch.from_numpy(y_test).long().to(device[1])
 test_label = test_label.argmax(dim=1)
-test_mask = torch.from_numpy(test_mask.astype(np.int)).to(device)
+test_mask = torch.from_numpy(test_mask.astype(np.int)).to(device[1])
 
-i = torch.from_numpy(features[0]).long().to(device)
-v = torch.from_numpy(features[1]).to(device)
-feature = torch.sparse.FloatTensor(i.t(), v, features[2]).to(device)
+i = torch.from_numpy(features[0]).long().to(device[0])
+v = torch.from_numpy(features[1]).to(device[0])
+feature = torch.sparse.FloatTensor(i.t(), v, features[2]).to(device[0])
 
-i = torch.from_numpy(supports[0]).long().to(device)
-v = torch.from_numpy(supports[1]).to(device)
-support = torch.sparse.FloatTensor(i.t(), v, supports[2]).float().to(device)
+i = torch.from_numpy(supports[0]).long().to(device[0])
+v = torch.from_numpy(supports[1]).to(device[0])
+support = torch.sparse.FloatTensor(i.t(), v, supports[2]).float().to(device[0])
 
 print('x :', feature)
 print('sp:', support)
@@ -53,20 +57,22 @@ feat_dim = feature.shape[1]
 
 
 net = GCN(feat_dim, num_classes, num_features_nonzero)
-net.to(device)
+# net.to(device)
 optimizer = optim.Adam(net.parameters(), lr=args.learning_rate)
 
 net.train()
+
 #计算时间
 torch.cuda.synchronize()
 start = time.time()
 
 for epoch in range(args.epochs):
-
     out = net((feature, support))
     out = out[0]
+    out.to(device[1])
     loss = masked_loss(out, train_label, train_mask)
     loss += args.weight_decay * net.l2_loss()
+
 
     acc = masked_acc(out, train_label, train_mask)
 

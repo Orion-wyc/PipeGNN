@@ -1,20 +1,20 @@
-import torch
-from torch import nn
-from torch.nn import functional as F
-from utils import sparse_dropout, dot
+import  torch
+from    torch import nn
+from    torch.nn import functional as F
+from    utils import sparse_dropout, dot
 
 
 class GraphConvolution(nn.Module):
+
 
     def __init__(self, input_dim, output_dim, num_features_nonzero,
                  dropout=0.,
                  is_sparse_inputs=False,
                  bias=False,
-                 activation=F.relu,
+                 activation = F.relu,
                  featureless=False):
-        # super(GraphConvolution,self) 首先找到 GraphConvolution 的父类（就是类 nn.Module）
-        # 然后把类 GraphConvolution 的对象转换为类 nn.Module 的对象
         super(GraphConvolution, self).__init__()
+
 
         self.dropout = dropout
         self.bias = bias
@@ -28,6 +28,7 @@ class GraphConvolution(nn.Module):
         if bias:
             self.bias = nn.Parameter(torch.zeros(output_dim))
 
+
     def forward(self, inputs):
         # print('inputs:', inputs)
         x, support = inputs
@@ -38,7 +39,7 @@ class GraphConvolution(nn.Module):
             x = F.dropout(x, self.dropout)
 
         # convolve
-        if not self.featureless:  # if it has features x
+        if not self.featureless: # if it has features x
             if self.is_sparse_inputs:
                 xw = torch.sparse.mm(x, self.weight)
             else:
@@ -52,3 +53,4 @@ class GraphConvolution(nn.Module):
             out += self.bias
 
         return self.activation(out), support
+
